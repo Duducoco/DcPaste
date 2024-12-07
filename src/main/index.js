@@ -1,7 +1,6 @@
 // src/background.js
-import { app, BrowserWindow, Tray, Menu, globalShortcut, screen} from 'electron'
+import { app, BrowserWindow, Tray, Menu, globalShortcut, screen, nativeTheme } from 'electron'
 import {join} from 'path'
-import icon from '../../resources/icon.png?asset'
 import {ClipboardObserver} from './clipboardObserver.js';
 import {ClipboardHistory} from './clipboardHistory.js';
 import { registerIpcHandlers } from './ipc';
@@ -12,6 +11,10 @@ const WINDOW_HEIGHT = 600
 
 let mainWindow;
 let tray = null;
+
+const WHITE_ICON = join(__dirname, '../../resources', 'white.png')
+const BLACK_ICON = join(__dirname, '../../resources', 'black.png')
+
 function createWindow () {
   mainWindow = new BrowserWindow({
     width: WINDOW_WIDTH,
@@ -20,7 +23,8 @@ function createWindow () {
     //删除滚动条以及滚动条的样式
     frame: false,
     show: false, // 默认隐藏
-    ...(process.platform === 'linux' ? { icon } : {}),
+    // ...(process.platform === 'linux' ? { icon } : {}),
+    icon: nativeTheme.shouldUseDarkColors ? WHITE_ICON : BLACK_ICON,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -59,7 +63,7 @@ function createWindow () {
 
   
 
-  tray = new Tray(join(__dirname,'../../resources', 'icon.ico'))
+  tray = new Tray(nativeTheme.shouldUseDarkColors ? WHITE_ICON : BLACK_ICON)
   const contextMenu = Menu.buildFromTemplate([
     {
       label: '退出', click: function () {
@@ -70,7 +74,7 @@ function createWindow () {
   ])
   tray.setContextMenu(contextMenu)
 
-  tray.setToolTip('ClipManager')
+  tray.setToolTip('DcPaste')
   tray.setContextMenu(contextMenu)
 
   tray.on('click', () => {
@@ -81,8 +85,12 @@ function createWindow () {
     }
   })
 
+  // 监听系统主题变化
+  nativeTheme.on('updated', () => {
+    tray.setImage(nativeTheme.shouldUseDarkColors ? WHITE_ICON : BLACK_ICON)
+    mainWindow.setIcon(nativeTheme.shouldUseDarkColors ? WHITE_ICON : BLACK_ICON)
+  })
 
-  
 }
 
 let clipboardObserver = null;

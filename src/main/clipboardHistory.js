@@ -1,7 +1,6 @@
 import {ClipboardItem} from './clipboardItem';
 import { nativeImage } from 'electron';
 import clipboardEx from 'electron-clipboard-ex';
-import fs from 'fs';
 const { clipboard } = require('electron');
 import Store from 'electron-store';
 const store = new Store();
@@ -26,14 +25,6 @@ class ClipboardHistory {
     addItem(object) {
         if (!(object instanceof ClipboardItem)) {
             throw new Error('object is not a instance of ClipboardItem');
-        }
-        if(object.type === 'rtf'){
-            //写入rtf.txt
-            if(!fs.existsSync('rtf.txt')){
-                fs.writeFileSync('rtf.txt', object.rtf);
-            }else{
-                fs.appendFileSync('rtf2.txt', object.rtf);
-            }
         }
 
         //判断重复,如果重复则将重复的item移动到开头
@@ -78,6 +69,10 @@ class ClipboardHistory {
                 });
 
             }
+        }
+        //写入后隐藏窗口
+        if (this.window.isVisible()) {
+            this.window.hide();
         }
     }
 

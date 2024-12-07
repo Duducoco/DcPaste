@@ -48,7 +48,7 @@ function moveToTop(timestamp){
 
 
 
-// 计算属性:根据搜索框内容过滤剪贴板历史
+// 计算属性:根据搜索框内容剪贴板历史
 const filteredHistory = computed(() => {
   if (!searchText.value) return clipboardHistory.value;
   const lowerCaseSearch = searchText.value.toLowerCase();
@@ -85,7 +85,7 @@ async function handleKeyDown(event) {
 }
 
 
-// 监听selectedIndex变化,让对应的列表项滚动到可视区域
+// 监听selectedIndex变化,让对应的列项动到可视区域
 watch(selectedIndex, async () => {
   await nextTick();
   const selectedElement = document.querySelector('.v-list-item--active');
@@ -113,7 +113,7 @@ watch(selectedIndex, async () => {
     ></v-text-field>
 
     <v-virtual-scroll
-      :height="420"
+      :height="480"
       :items="filteredHistory"
       :item-height="50"
       key-field="timestamp"
@@ -164,5 +164,36 @@ watch(selectedIndex, async () => {
   z-index: 1;
 }
 
+/* 自定义滚动条样式 */
+:deep(.v-virtual-scroll) {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(144, 147, 153, 0.3) transparent;
+}
+
+:deep(.v-virtual-scroll::-webkit-scrollbar) {
+  width: 4px;
+}
+
+:deep(.v-virtual-scroll::-webkit-scrollbar-track) {
+  background: transparent;
+  margin: 4px 0;
+}
+
+:deep(.v-virtual-scroll::-webkit-scrollbar-thumb) {
+  background-color: rgba(144, 147, 153, 0.3);
+  border-radius: 4px;
+  border: none;
+  min-height: 40px;
+}
+
+:deep(.v-virtual-scroll::-webkit-scrollbar-thumb:hover) {
+  background-color: rgba(144, 147, 153, 0.5);
+}
+
+:deep(.v-virtual-scroll::-webkit-scrollbar-button) {
+  display: none !important;
+  height: 0 !important;
+  width: 0 !important;
+}
 </style>
 
