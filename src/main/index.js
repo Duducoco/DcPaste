@@ -5,17 +5,23 @@ import {ClipboardObserver} from './clipboardObserver.js';
 import {ClipboardHistory} from './clipboardHistory.js';
 import { registerIpcHandlers } from './ipc';
 const {powerMonitor} = require("electron")
-
+import { getPreviousWindow, activatePreviousWindow } from './windowManager.js';
 const WINDOW_WIDTH = 800
 const WINDOW_HEIGHT = 600
 
+let previousWindow;
 let mainWindow;
 let tray = null;
 
 const WHITE_ICON = join(__dirname, '../../resources', 'white.png')
 const BLACK_ICON = join(__dirname, '../../resources', 'black.png')
 
-
+app.setLoginItemSettings({
+  openAtLogin: true,
+  args: [
+    '--process-start-args', '"--hidden"'
+  ]
+})
 
 function createWindow () {
   mainWindow = new BrowserWindow({
@@ -33,9 +39,10 @@ function createWindow () {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
     }
-
-   
   });
+
+  // 隐藏任务栏图标
+  mainWindow.setSkipTaskbar(true)
 
   // 禁用滚动条
   mainWindow.webContents.on('did-finish-load', () => {
@@ -53,14 +60,20 @@ function createWindow () {
   mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   
   //失去焦点 自动隐藏
-  mainWindow.on('blur', () => {
-    mainWindow.hide();
+  mainWindow.on('blur', async () => {
+    if(mainWindow.isVisible()){
+      mainWindow.hide();
+      await activatePreviousWindow();
+    }
   });
 
-  mainWindow.on('close', (e) => {
-    e.preventDefault(); // 阻止退出程序
-    mainWindow.setSkipTaskbar(true); // 取消任务栏显示
-    mainWindow.hide(); // 隐藏主程序窗口
+  mainWindow.on('close', async (e) => {
+    e.preventDefault();
+    mainWindow.setSkipTaskbar(true);
+    if (mainWindow.isVisible()) {
+      mainWindow.hide();
+      await activatePreviousWindow();
+    }
   })
 
   
@@ -79,11 +92,13 @@ function createWindow () {
   tray.setToolTip('DcPaste')
   tray.setContextMenu(contextMenu)
 
-  tray.on('click', () => {
+  tray.on('click', async () => {
     if(mainWindow.isVisible()){
-      mainWindow.hide()
+      mainWindow.hide();
+      await activatePreviousWindow();
     }else{
-      mainWindow.show()
+      await getPreviousWindow();
+      mainWindow.show();
     }
   })
 
@@ -99,27 +114,29 @@ let clipboardObserver = null;
 
 app.on('ready', () => {
   createWindow();
-  // 注册全局快捷键，例如 Ctrl+Shift+V
-  const ret = globalShortcut.register('Alt+D', () => {
+  const ret = globalShortcut.register('Alt+D', async () => {
     if (mainWindow.isVisible()) {
       mainWindow.hide();
+      await activatePreviousWindow();
       return;
     }
     if (mainWindow) {
-      const cursorPos = screen.getCursorScreenPoint()
-      const currentDisplay = screen.getDisplayNearestPoint(cursorPos)
-      const { bounds } = currentDisplay
-      const x = bounds.x + Math.round((bounds.width - WINDOW_WIDTH) / 2)
-      const y = bounds.y + Math.round((bounds.height - WINDOW_HEIGHT) / 2)
+      // 在显示窗口之前记录当前活动窗口
+      await getPreviousWindow();
+      
+      const cursorPos = screen.getCursorScreenPoint();
+      const currentDisplay = screen.getDisplayNearestPoint(cursorPos);
+      const { bounds } = currentDisplay;
+      const x = bounds.x + Math.round((bounds.width - WINDOW_WIDTH) / 2);
+      const y = bounds.y + Math.round((bounds.height - WINDOW_HEIGHT) / 2);
+      
       mainWindow.setBounds({
         width: WINDOW_WIDTH,
         height: WINDOW_HEIGHT
-      })
-      mainWindow.setPosition(x, y)
-      mainWindow.setResizable(false)
-      //显示窗口
+      });
+      mainWindow.setPosition(x, y);
+      mainWindow.setResizable(false);
       mainWindow.show();
-      //将窗口聚焦
       mainWindow.focus();
     }
   });
@@ -147,7 +164,7 @@ if (!gotTheLock) {
  app.quit()
 } else {
  app.on('second-instance', (event, commandLine, workingDirectory) => {
-   // 当运行第二个实例时,将会聚焦到mainWindow这个窗口
+   // 当运行第二个实例时,将会聚焦到mainWindow个窗口
    if (mainWindow) {
      if (mainWindow.isMinimized()) mainWindow.restore()
      mainWindow.focus()

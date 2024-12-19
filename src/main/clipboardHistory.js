@@ -12,6 +12,12 @@ class ClipboardHistory {
         const rawHistory = store.get('clipboard-history') || [];
         this.history = [];
         for (let item of rawHistory) {
+            //判断时间，如果当前item的时间戳与现在超过了7天，则不用添加到history
+            const SEVEN_DAYS_IN_MS = 7 * 24 * 60 * 60 * 1000;
+            const currentTime = Date.now();
+            if (currentTime - item.timestamp > SEVEN_DAYS_IN_MS) {
+                continue;
+            }
             try {
                 const clipboardItem = ClipboardItem.createFromJSON(item);
                 this.history.push(clipboardItem);
@@ -19,7 +25,6 @@ class ClipboardHistory {
                 console.error('Failed to restore clipboard item:', error);
             }
         }
-        
     }
 
     addItem(object) {

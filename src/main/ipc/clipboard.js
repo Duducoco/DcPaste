@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron';
 const clipboardEx = require('electron-clipboard-ex');
+import { getPreviousWindow, activatePreviousWindow } from '../windowManager.js';
 
 export function registerClipboardHandlers(clipboardHistory) {
     // 获取剪贴板历史
