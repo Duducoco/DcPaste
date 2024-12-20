@@ -1,15 +1,15 @@
 // src/background.js
 import { app, BrowserWindow, Tray, Menu, globalShortcut, screen, nativeTheme } from 'electron'
 import {join} from 'path'
-import {ClipboardObserver} from './clipboardObserver.js';
-import {ClipboardHistory} from './clipboardHistory.js';
+import {ClipboardObserver} from './clipboard/clipboardObserver.js';
+import {ClipboardHistory} from './clipboard/clipboardHistory.js';
 import { registerIpcHandlers } from './ipc';
 const {powerMonitor} = require("electron")
 import { getPreviousWindow, activatePreviousWindow } from './windowManager.js';
+import { hideWindow, showWindow } from './utils.js';
 const WINDOW_WIDTH = 800
 const WINDOW_HEIGHT = 600
 
-let previousWindow;
 let mainWindow;
 let tray = null;
 
@@ -31,7 +31,6 @@ function createWindow () {
     //删除滚动条以及滚动条的样式
     frame: false,
     show: false, // 默认隐藏
-    // ...(process.platform === 'linux' ? { icon } : {}),
     icon: nativeTheme.shouldUseDarkColors ? WHITE_ICON : BLACK_ICON,
     webPreferences: {
       nodeIntegration: true,
@@ -61,19 +60,14 @@ function createWindow () {
   
   //失去焦点 自动隐藏
   mainWindow.on('blur', async () => {
-    if(mainWindow.isVisible()){
-      mainWindow.hide();
-      await activatePreviousWindow();
-    }
+    // mainWindow.hide();
+    hideWindow(mainWindow);
   });
 
   mainWindow.on('close', async (e) => {
     e.preventDefault();
     mainWindow.setSkipTaskbar(true);
-    if (mainWindow.isVisible()) {
-      mainWindow.hide();
-      await activatePreviousWindow();
-    }
+    hideWindow(mainWindow);
   })
 
   
@@ -93,13 +87,7 @@ function createWindow () {
   tray.setContextMenu(contextMenu)
 
   tray.on('click', async () => {
-    if(mainWindow.isVisible()){
-      mainWindow.hide();
-      await activatePreviousWindow();
-    }else{
-      await getPreviousWindow();
-      mainWindow.show();
-    }
+    showWindow(mainWindow);
   })
 
   // 监听系统主题变化
@@ -116,14 +104,10 @@ app.on('ready', () => {
   createWindow();
   const ret = globalShortcut.register('Alt+D', async () => {
     if (mainWindow.isVisible()) {
-      mainWindow.hide();
-      await activatePreviousWindow();
+      hideWindow(mainWindow);
       return;
-    }
-    if (mainWindow) {
+    }else if (!mainWindow.isVisible()) {
       // 在显示窗口之前记录当前活动窗口
-      await getPreviousWindow();
-      
       const cursorPos = screen.getCursorScreenPoint();
       const currentDisplay = screen.getDisplayNearestPoint(cursorPos);
       const { bounds } = currentDisplay;
@@ -136,8 +120,9 @@ app.on('ready', () => {
       });
       mainWindow.setPosition(x, y);
       mainWindow.setResizable(false);
-      mainWindow.show();
+      showWindow(mainWindow);
       mainWindow.focus();
+      return;
     }
   });
 
@@ -168,7 +153,7 @@ if (!gotTheLock) {
    if (mainWindow) {
      if (mainWindow.isMinimized()) mainWindow.restore()
      mainWindow.focus()
-     mainWindow.show()
+     showWindow(mainWindow);
    }
  })
 }

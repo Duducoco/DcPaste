@@ -3,6 +3,8 @@ import { nativeImage } from 'electron';
 import clipboardEx from 'electron-clipboard-ex';
 const { clipboard } = require('electron');
 import Store from 'electron-store';
+import { hideWindow, showWindow } from '../utils.js';
+
 const store = new Store();
 
 
@@ -58,7 +60,7 @@ class ClipboardHistory {
     }
 
     //将timestamp为timestamp的item写入剪贴板
-    write2Clipboard(timestamp){
+    async write2Clipboard(timestamp){
         const item = this.history.find(item => item.timestamp === timestamp);
         if (item) {
 
@@ -76,9 +78,7 @@ class ClipboardHistory {
             }
         }
         //写入后隐藏窗口
-        if (this.window.isVisible()) {
-            this.window.hide();
-        }
+        hideWindow(this.window);
     }
 
 
