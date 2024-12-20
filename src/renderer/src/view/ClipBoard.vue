@@ -44,10 +44,6 @@ function moveToTop(timestamp){
 }
 
 
-
-
-
-
 // 计算属性:根据搜索框内容剪贴板历史
 const filteredHistory = computed(() => {
   if (!searchText.value) return clipboardHistory.value;
@@ -62,6 +58,9 @@ const filteredHistory = computed(() => {
   });
 });
 
+function resetSelectedIndex(){
+  selectedIndex.value = 0;
+}
 
 // 处理点击列表项
 async function handleClickItem(index){
@@ -69,6 +68,7 @@ async function handleClickItem(index){
   window.clipboard.write2Clipboard(filteredHistory.value[index].timestamp);
   moveToTop(filteredHistory.value[index].timestamp);
   focusOnSearch();
+  resetSelectedIndex();
 }
 
 // 处理键盘事件列表项
@@ -81,6 +81,7 @@ async function handleKeyDown(event) {
     const selectedItemTimestamp = filteredHistory.value[selectedIndex.value].timestamp;
     moveToTop(selectedItemTimestamp);
     window.clipboard.write2Clipboard(selectedItemTimestamp);
+    resetSelectedIndex();
   }
 }
 
