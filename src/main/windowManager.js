@@ -2,7 +2,8 @@ import { windowManager } from '@johnlindquist/node-window-manager'
 
 let previousWindow = null
 
-async function getPreviousWindow() {
+// 同步获取，不阻塞主流程
+function getPreviousWindow() {
   try {
     previousWindow = windowManager.getActiveWindow()
   } catch (error) {
@@ -10,13 +11,17 @@ async function getPreviousWindow() {
   }
 }
 
-async function activatePreviousWindow() {
+// 异步激活，不阻塞隐藏窗口
+function activatePreviousWindow() {
   if (previousWindow) {
-    try {
-      previousWindow.bringToTop()
-    } catch (error) {
-      console.error('Error activating previous window:', error)
-    }
+    // 使用 setImmediate 异步执行，避免阻塞
+    setImmediate(() => {
+      try {
+        previousWindow.bringToTop()
+      } catch (error) {
+        console.error('Error activating previous window:', error)
+      }
+    })
   }
 }
 

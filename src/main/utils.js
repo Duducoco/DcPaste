@@ -1,15 +1,15 @@
 import { getPreviousWindow, activatePreviousWindow } from './windowManager.js'
 
-async function hideWindow(window) {
+function hideWindow(window) {
   if (window.isVisible()) {
     window.hide()
-    await activatePreviousWindow()
+    activatePreviousWindow() // 异步执行，不阻塞
   }
 }
 
-async function showWindow(window) {
+function showWindow(window) {
   if (!window.isVisible()) {
-    await getPreviousWindow()
+    getPreviousWindow() // 同步获取当前窗口
     window.show()
   }
 }

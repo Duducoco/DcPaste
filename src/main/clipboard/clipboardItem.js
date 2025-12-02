@@ -1,8 +1,6 @@
 class ClipboardItem {
-  constructor(text, rtf, html, image_url, file_paths, timestamp) {
+  constructor(text, image_url, file_paths, timestamp) {
     this.text = text || '' //string
-    this.rtf = rtf || '' //string
-    this.html = html || '' //string
     this.image_url = image_url || '' //string
     this.file_paths = file_paths || [] //string[]
     this.timestamp = timestamp
@@ -12,10 +10,6 @@ class ClipboardItem {
       this.type = 'image'
     } else if (this.file_paths && this.file_paths.length > 0) {
       this.type = 'files'
-    } else if (this.rtf) {
-      this.type = 'rtf'
-    } else if (this.html) {
-      this.type = 'html'
     } else if (this.text) {
       this.type = 'text'
     } else {
@@ -26,8 +20,6 @@ class ClipboardItem {
   isEmpty() {
     return (
       this.text === '' &&
-      this.rtf === '' &&
-      this.html === '' &&
       this.image_url === '' &&
       (!this.file_paths || this.file_paths.length === 0)
     )
@@ -41,9 +33,16 @@ class ClipboardItem {
     if (this.type === 'image') {
       return this.image_url === item.image_url
     } else if (this.type === 'files') {
-      return JSON.stringify(this.file_paths) === JSON.stringify(item.file_paths)
+      // 优化：直接比较数组，避免 JSON.stringify 开销
+      const a = this.file_paths || []
+      const b = item.file_paths || []
+      if (a.length !== b.length) return false
+      for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return false
+      }
+      return true
     } else {
-      return this.text === item.text && this.rtf === item.rtf && this.html === item.html
+      return this.text === item.text
     }
   }
 
@@ -51,8 +50,6 @@ class ClipboardItem {
     return {
       type: this.type,
       text: this.text,
-      rtf: this.rtf,
-      html: this.html,
       image_url: this.image_url,
       file_paths: this.file_paths,
       timestamp: this.timestamp
@@ -60,14 +57,7 @@ class ClipboardItem {
   }
 
   static createFromJSON(json) {
-    return new ClipboardItem(
-      json.text,
-      json.rtf,
-      json.html,
-      json.image_url,
-      json.file_paths,
-      json.timestamp
-    )
+    return new ClipboardItem(json.text, json.image_url, json.file_paths, json.timestamp)
   }
 }
 

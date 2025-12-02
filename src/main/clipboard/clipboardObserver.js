@@ -7,8 +7,6 @@ class ClipboardObserver {
     this.clipboardHistory = clipboardHistory
     this.timer = null
     this.beforeText = null
-    this.beforeRtf = null
-    this.beforeHtml = null
     this.beforeImage = null
     this.beforeFiles = null
     this.isStart = false
@@ -18,26 +16,39 @@ class ClipboardObserver {
     this.timer = setInterval(() => {
       try {
         const text = clipboard.readText()
-        const rtf = clipboard.readRTF()
-        const html = clipboard.readHTML()
-        let image_obj = clipboard.readImage()
-        const image = image_obj.isEmpty() ? '' : image_obj.toDataURL()
         const files = clipboardEx.readFilePaths() || []
 
-        if (
-          this.isDiffText(this.beforeText, text) ||
-          this.isDiffRtf(this.beforeRtf, rtf) ||
-          this.isDiffHtml(this.beforeHtml, html) ||
-          this.isDiffImage(this.beforeImage, image) ||
-          this.isDiffFiles(this.beforeFiles, files)
-        ) {
+        const textChanged = this.isDiffText(this.beforeText, text)
+        const filesChanged = this.isDiffFiles(this.beforeFiles, files)
+
+        // 只有当文本和文件都为空或未变化时，才检查图片（避免昂贵的 toDataURL 操作）
+        let image = this.beforeImage
+        let imageChanged = false
+
+        if (!textChanged && !filesChanged) {
+          // 文本和文件都没变化，检查是否可能是图片
+          const image_obj = clipboard.readImage()
+          if (!image_obj.isEmpty()) {
+            image = image_obj.toDataURL()
+            imageChanged = this.isDiffImage(this.beforeImage, image)
+          } else if (this.beforeImage) {
+            // 之前有图片，现在没有了
+            image = ''
+            imageChanged = true
+          }
+        } else {
+          // 文本或文件有变化，也读取一下图片状态
+          const image_obj = clipboard.readImage()
+          image = image_obj.isEmpty() ? '' : image_obj.toDataURL()
+          imageChanged = this.isDiffImage(this.beforeImage, image)
+        }
+
+        if (textChanged || filesChanged || imageChanged) {
           const timestamp = Date.now()
-          const item = new ClipboardItem(text, rtf, html, image, files, timestamp)
+          const item = new ClipboardItem(text, image, files, timestamp)
           if (!item.isEmpty()) {
             this.clipboardHistory.addItem(item)
             this.beforeText = text
-            this.beforeRtf = rtf
-            this.beforeHtml = html
             this.beforeImage = image
             this.beforeFiles = files
           }
@@ -62,10 +73,8 @@ class ClipboardObserver {
   setClipboardDefaultValue() {
     try {
       this.beforeText = clipboard.readText()
-      this.beforeRtf = clipboard.readRTF()
       let image = clipboard.readImage()
       this.beforeImage = image.isEmpty() ? '' : image.toDataURL()
-      this.beforeHtml = clipboard.readHTML()
       this.beforeFiles = clipboardEx.readFilePaths() || []
     } catch (error) {
       console.error('Error reading clipboard default value:', error)
@@ -80,15 +89,6 @@ class ClipboardObserver {
    */
   isDiffText(beforeText, afterText) {
     return beforeText !== afterText
-  }
-  /**
-   * 判断rtf是否不一致
-   * @param beforeRtf
-   * @param afterRtf
-   * @returns
-   */
-  isDiffRtf(beforeRtf, afterRtf) {
-    return beforeRtf !== afterRtf
   }
 
   /**
@@ -121,16 +121,6 @@ class ClipboardObserver {
       }
     }
     return false
-  }
-
-  /**
-   * 判断html是否不一致
-   * @param beforeHtml
-   * @param afterHtml
-   * @returns
-   */
-  isDiffHtml(beforeHtml, afterHtml) {
-    return beforeHtml !== afterHtml
   }
 
   /**

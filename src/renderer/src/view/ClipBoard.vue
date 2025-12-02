@@ -1,8 +1,9 @@
 <script setup>
 // import { clipboard,nativeImage } from 'electron';
-import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue';
+import { ref, shallowRef, onMounted, onUnmounted, computed, nextTick, watch, triggerRef } from 'vue';
 
-const clipboardHistory = ref([]);
+// 使用 shallowRef 避免深度响应，提升大数组性能
+const clipboardHistory = shallowRef([]);
 const selectedIndex = ref(0);
 const searchText = ref('');
 let removeClipboardListener = null
@@ -19,6 +20,7 @@ onMounted(async () => {
   // 监听剪贴板历史数据变化，并保存移除函数
   removeClipboardListener = window.clipboard.onAddClipboardItem((item) => {
     clipboardHistory.value.unshift(item);
+    triggerRef(clipboardHistory); // 手动触发更新
   });
 });
 
@@ -40,23 +42,35 @@ function focusOnSearch() {
 
 /**
  * 将timestamp为timestamp的item移动到第0个位置
- * @param timestamp 
+ * @param timestamp
  */
 function moveToTop(timestamp){
   const index = clipboardHistory.value.findIndex(item => item.timestamp === timestamp);
   if (index !== -1) {
     let deletedItem = clipboardHistory.value.splice(index, 1)[0];
     clipboardHistory.value.unshift(deletedItem);
+    triggerRef(clipboardHistory); // 手动触发更新
   }
 }
 
 
+// 判断一个项目是否有有效内容
+function hasValidContent(item) {
+  if (item.type === 'image' && item.image_url) return true
+  if (item.type === 'files' && item.file_paths && item.file_paths.length > 0) return true
+  if (item.text) return true
+  return false
+}
+
 // 计算属性:根据搜索框内容剪贴板历史
 const filteredHistory = computed(() => {
-  if (!searchText.value) return clipboardHistory.value;
+  // 先过滤掉空记录
+  const validHistory = clipboardHistory.value.filter(hasValidContent)
+
+  if (!searchText.value) return validHistory;
   const lowerCaseSearch = searchText.value.toLowerCase();
-  return clipboardHistory.value.filter(item => {
-    if(item.type === 'text' || item.type === 'rtf' || item.type==='html'){
+  return validHistory.filter(item => {
+    if(item.type === 'text'){
       // 防止 item.text 为 null/undefined
       return (item.text || '').toLowerCase().includes(lowerCaseSearch)
     }else if(item.type === 'files'){
@@ -152,14 +166,6 @@ watch(searchText, () => {
             <v-icon style="margin-right: 10px;">mdi-format-text-variant</v-icon>
             {{ item.text }}
           </v-list-item-title>
-          <v-list-item-title v-else-if="item.type === 'rtf'">
-            <v-icon style="margin-right: 10px;">mdi-format-text-rotation-none</v-icon>
-            {{ item.text }}
-          </v-list-item-title>
-          <v-list-item-title v-else-if="item.type === 'html'">
-            <v-icon style="margin-right: 10px;">mdi-code-block-tags</v-icon>
-            {{ item.text }}
-          </v-list-item-title>
           <v-list-item-title v-else-if="item.type === 'files'">
             <div style="display: flex; align-items: left;">
               <v-icon style="margin-right: 10px;">mdi-file</v-icon>
@@ -174,6 +180,11 @@ watch(searchText, () => {
               <v-icon style="margin-right: 10px;">mdi-image</v-icon>
               <v-img :src="item.image_url" max-width="100" max-height="100"></v-img>
             </div>
+          </v-list-item-title>
+          <!-- 兜底：处理旧数据中的 rtf/html 或未知类型 -->
+          <v-list-item-title v-else>
+            <v-icon style="margin-right: 10px;">mdi-format-text-variant</v-icon>
+            {{ item.text }}
           </v-list-item-title>
         </v-list-item>
       </template>

@@ -19,6 +19,7 @@ const WINDOW_HEIGHT = 600
 
 let mainWindow
 let tray = null
+let clipboardHistory = null // 提升为模块级变量，用于退出时保存数据
 
 const WHITE_ICON = join(__dirname, '../../resources', 'white.png')
 const BLACK_ICON = join(__dirname, '../../resources', 'black.png')
@@ -88,7 +89,7 @@ function createWindow() {
   tray.setContextMenu(contextMenu)
   tray.setToolTip('DcPaste')
 
-  tray.on('click', async () => {
+  tray.on('click', () => {
     showWindow(mainWindow)
   })
 
@@ -104,10 +105,9 @@ let cleanupIpcHandlers = null
 
 app.on('ready', () => {
   createWindow()
-  const ret = globalShortcut.register('Alt+D', async () => {
+  const ret = globalShortcut.register('Alt+D', () => {
     if (mainWindow.isVisible()) {
       hideWindow(mainWindow)
-      return
     } else {
       // 在显示窗口之前记录当前活动窗口
       const cursorPos = screen.getCursorScreenPoint()
@@ -124,11 +124,10 @@ app.on('ready', () => {
       mainWindow.setResizable(false)
       showWindow(mainWindow)
       mainWindow.focus()
-      return
     }
   })
 
-  const clipboardHistory = new ClipboardHistory(mainWindow)
+  clipboardHistory = new ClipboardHistory(mainWindow)
   clipboardObserver = new ClipboardObserver(clipboardHistory)
   cleanupIpcHandlers = registerIpcHandlers({ clipboardHistory })
 
@@ -173,6 +172,10 @@ app.on('will-quit', () => {
   globalShortcut.unregisterAll()
   if (clipboardObserver && clipboardObserver.isStart) {
     clipboardObserver.stop()
+  }
+  // 立即保存剪贴板历史（防止防抖延迟导致数据丢失）
+  if (clipboardHistory) {
+    clipboardHistory.saveNow()
   }
   // 清理 IPC 监听器
   if (cleanupIpcHandlers) {

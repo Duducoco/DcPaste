@@ -9,9 +9,13 @@ const store = new Store()
 // 历史记录最大数量
 const MAX_HISTORY_SIZE = 500
 
+// 存储防抖延迟（毫秒）
+const SAVE_DEBOUNCE_DELAY = 1500
+
 class ClipboardHistory {
   constructor(window) {
     this.window = window //主窗口
+    this.saveTimer = null // 防抖定时器
     const rawHistory = store.get('clipboard-history') || []
     this.history = []
     const SEVEN_DAYS_IN_MS = 7 * 24 * 60 * 60 * 1000
@@ -44,6 +48,26 @@ class ClipboardHistory {
     }
   }
 
+  // 防抖保存到存储
+  debounceSave() {
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer)
+    }
+    this.saveTimer = setTimeout(() => {
+      store.set('clipboard-history', this.history)
+      this.saveTimer = null
+    }, SAVE_DEBOUNCE_DELAY)
+  }
+
+  // 立即保存（用于应用退出前）
+  saveNow() {
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer)
+      this.saveTimer = null
+    }
+    store.set('clipboard-history', this.history)
+  }
+
   addItem(object) {
     if (!(object instanceof ClipboardItem)) {
       throw new Error('object is not a instance of ClipboardItem')
@@ -65,7 +89,7 @@ class ClipboardHistory {
       this.history.pop()
     }
 
-    store.set('clipboard-history', this.history)
+    this.debounceSave() // 使用防抖保存
     // 检查窗口是否有效再发送
     if (this.window && !this.window.isDestroyed() && this.window.webContents) {
       this.window.webContents.send('add-clipboard-item', object) //向渲染进程添加
@@ -78,7 +102,7 @@ class ClipboardHistory {
     if (index !== -1) {
       let deletedItem = this.history.splice(index, 1)[0]
       this.history.unshift(deletedItem)
-      store.set('clipboard-history', this.history)
+      this.debounceSave() // 使用防抖保存
     }
   }
 
@@ -91,11 +115,7 @@ class ClipboardHistory {
       } else if (item.type === 'image' && item.image_url) {
         clipboard.writeImage(nativeImage.createFromDataURL(item.image_url))
       } else {
-        clipboard.write({
-          text: item.text || '',
-          rtf: item.rtf || '',
-          html: item.html || ''
-        })
+        clipboard.writeText(item.text || '')
       }
       //写入后隐藏窗口
       hideWindow(this.window)
