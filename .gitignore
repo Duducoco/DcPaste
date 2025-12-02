@@ -3,3 +3,9 @@ dist
 out
 .DS_Store
 *.log*
+nul
+CLAUDE.md
+.serena
+.claude
+build/
+.vscode

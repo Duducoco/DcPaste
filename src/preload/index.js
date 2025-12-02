@@ -9,11 +9,15 @@ const clipboardApi = {
   moveToTop: (timestamp) => ipcRenderer.send('move-to-top', timestamp),
 
   // 主进程向渲染进程发送剪贴板历史
-  onAddClipboardItem: (callback) => ipcRenderer.on('add-clipboard-item', (_event, item) => callback(item)),
+  onAddClipboardItem: (callback) => {
+    const handler = (_event, item) => callback(item)
+    ipcRenderer.on('add-clipboard-item', handler)
+    // 返回移除监听器的函数
+    return () => ipcRenderer.removeListener('add-clipboard-item', handler)
+  },
 
   // 将timestamp为timestamp的item写入剪贴板
-  write2Clipboard: (timestamp) => ipcRenderer.send('write2clipboard', timestamp),
-  
+  write2Clipboard: (timestamp) => ipcRenderer.send('write2clipboard', timestamp)
 }
 
 if (process.contextIsolated) {

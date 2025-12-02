@@ -7,20 +7,19 @@ import { aliases, mdi } from 'vuetify/iconsets/mdi'
 
 import '@mdi/font/css/materialdesignicons.css'
 
-
 const vuetify = createVuetify({
   components,
   directives,
   theme: {
-    defaultTheme: 'dark',
+    defaultTheme: 'dark'
   },
   icons: {
     defaultSet: 'mdi',
     aliases,
     sets: {
-      mdi,
-    },
-  },
+      mdi
+    }
+  }
 })
 
 export default vuetify

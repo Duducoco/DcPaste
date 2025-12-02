@@ -1,10 +1,11 @@
 <script setup>
 // import { clipboard,nativeImage } from 'electron';
-import { ref, onMounted, computed, nextTick, watch } from 'vue';
+import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue';
 
 const clipboardHistory = ref([]);
 const selectedIndex = ref(0);
 const searchText = ref('');
+let removeClipboardListener = null
 
 
 /**
@@ -14,7 +15,20 @@ onMounted(async () => {
   clipboardHistory.value = await window.clipboard.initClipboardHistory();
   await nextTick();
   focusOnSearch();
+
+  // 监听剪贴板历史数据变化，并保存移除函数
+  removeClipboardListener = window.clipboard.onAddClipboardItem((item) => {
+    clipboardHistory.value.unshift(item);
+  });
 });
+
+// 组件卸载时移除监听器
+onUnmounted(() => {
+  if (removeClipboardListener) {
+    removeClipboardListener()
+    removeClipboardListener = null
+  }
+})
 
 // 搜索框获取焦点
 function focusOnSearch() {
@@ -23,13 +37,6 @@ function focusOnSearch() {
     searchInput.focus();
   }
 }
-
-/**
- * 监听剪贴板历史数据变化
- */
-window.clipboard.onAddClipboardItem((item) => {
-  clipboardHistory.value.unshift(item);
-});
 
 /**
  * 将timestamp为timestamp的item移动到第0个位置
@@ -50,9 +57,11 @@ const filteredHistory = computed(() => {
   const lowerCaseSearch = searchText.value.toLowerCase();
   return clipboardHistory.value.filter(item => {
     if(item.type === 'text' || item.type === 'rtf' || item.type==='html'){
-      return item.text.toLowerCase().includes(lowerCaseSearch)
+      // 防止 item.text 为 null/undefined
+      return (item.text || '').toLowerCase().includes(lowerCaseSearch)
     }else if(item.type === 'files'){
-      return item.file_paths.join('\n').toLowerCase().includes(lowerCaseSearch)
+      // 防止 item.file_paths 为 null/undefined
+      return (item.file_paths || []).join('\n').toLowerCase().includes(lowerCaseSearch)
     }
     return false;
   });
@@ -62,13 +71,16 @@ function resetSelectedIndex(){
   selectedIndex.value = 0;
 }
 
-// 处理点击列表项
-async function handleClickItem(index){
-  selectedIndex.value = index;
-  window.clipboard.write2Clipboard(filteredHistory.value[index].timestamp);
-  moveToTop(filteredHistory.value[index].timestamp);
-  focusOnSearch();
-  resetSelectedIndex();
+// 处理点击列表项 - 使用 timestamp 而非 index 来定位
+async function handleClickItem(timestamp){
+  // 找到项目在 filteredHistory 中的实际索引
+  const index = filteredHistory.value.findIndex(item => item.timestamp === timestamp)
+  if (index === -1) return
+  selectedIndex.value = index
+  window.clipboard.write2Clipboard(timestamp)
+  moveToTop(timestamp)
+  focusOnSearch()
+  resetSelectedIndex()
 }
 
 // 处理键盘事件列表项
@@ -76,9 +88,15 @@ async function handleKeyDown(event) {
   if (event.key === 'ArrowUp') {
     selectedIndex.value = Math.max(selectedIndex.value - 1, 0);
   } else if (event.key === 'ArrowDown') {
+    // 防止越界：当列表为空时不处理
+    if (filteredHistory.value.length === 0) return
     selectedIndex.value = Math.min(selectedIndex.value + 1, filteredHistory.value.length - 1);
-  }else if(event.key === 'Enter'){
-    const selectedItemTimestamp = filteredHistory.value[selectedIndex.value].timestamp;
+  } else if (event.key === 'Enter') {
+    // 防止空数组访问
+    if (filteredHistory.value.length === 0) return
+    const selectedItem = filteredHistory.value[selectedIndex.value]
+    if (!selectedItem) return
+    const selectedItemTimestamp = selectedItem.timestamp
     moveToTop(selectedItemTimestamp);
     window.clipboard.write2Clipboard(selectedItemTimestamp);
     resetSelectedIndex();
@@ -93,6 +111,11 @@ watch(selectedIndex, async () => {
   if (selectedElement) {
     selectedElement.scrollIntoView({ behavior: 'instant', block: 'nearest' });
   }
+});
+
+// 监听搜索内容变化，重置选中索引
+watch(searchText, () => {
+  selectedIndex.value = 0;
 });
 
 
@@ -123,7 +146,7 @@ watch(selectedIndex, async () => {
         <!-- @click="selectedIndex = index; focusOnSearch()" -->
         <v-list-item
           :class="{ 'v-list-item--active': selectedIndex === index }"
-          @click="handleClickItem(index)"
+          @click="handleClickItem(item.timestamp)"
         >
           <v-list-item-title v-if="item.type === 'text'">
             <v-icon style="margin-right: 10px;">mdi-format-text-variant</v-icon>
@@ -141,8 +164,8 @@ watch(selectedIndex, async () => {
             <div style="display: flex; align-items: left;">
               <v-icon style="margin-right: 10px;">mdi-file</v-icon>
               <div style="white-space: pre-wrap;">
-                {{ item.file_paths.slice(0, 3).join('\n') }}
-                <span v-if="item.file_paths.length > 3">...等{{ item.file_paths.length}}个文件</span>
+                {{ (item.file_paths || []).slice(0, 3).join('\n') }}
+                <span v-if="item.file_paths && item.file_paths.length > 3">...等{{ item.file_paths.length}}个文件</span>
               </div>
             </div>
           </v-list-item-title>
